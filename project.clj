@@ -10,6 +10,7 @@
                  [org.clojure/clojurescript "1.7.228"]
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
+                 [inflections "0.12.0"]
                  [reagent "0.5.1"]]
 
   :plugins [[lein-figwheel "0.5.0-6"]
