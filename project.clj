@@ -6,11 +6,12 @@
 
   :min-lein-version "2.5.3"
 
-  :dependencies [[org.clojure/clojure "1.7.0"]
+  :dependencies [[inflections "0.12.0"]
+                 [org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.228"]
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
-                 [inflections "0.12.0"]
+                 [prismatic/schema "1.0.5"]
                  [reagent "0.5.1"]]
 
   :plugins [[lein-figwheel "0.5.0-6"]
