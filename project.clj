@@ -24,7 +24,7 @@
                 :source-paths ["src" "test"]
 
                 ;; If no code is to be run, set :figwheel true for continued automagical reloading
-                :figwheel {:on-jsload "honeydash.core/on-js-reload"}
+                :figwheel {:on-jsload "honeydash.test/run"}
 
                 :compiler {:main honeydash.core
                            :asset-path "js/compiled/out"

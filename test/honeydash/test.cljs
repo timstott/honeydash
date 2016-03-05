@@ -1,4 +1,4 @@
-(ns honeydash.test
+(ns ^:figwheel-always honeydash.test
   (:require [honeydash.core-test]
             [cljs.test :refer-macros [run-all-tests]]))
 
