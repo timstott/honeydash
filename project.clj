@@ -6,7 +6,8 @@
 
   :min-lein-version "2.5.3"
 
-  :dependencies [[inflections "0.12.0"]
+  :dependencies [[cljs-http "0.1.39"]
+                 [inflections "0.12.0"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.228"]
                  [org.clojure/core.async "0.2.374"
