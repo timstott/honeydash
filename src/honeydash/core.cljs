@@ -3,7 +3,7 @@
   (:require
    [clojure.string :as str]
    [cljs-http.client :as http]
-   [cljs.core.async :refer [<! >! chan timeout]]
+   [cljs.core.async :as async]
    [clojure.walk :as w]
    [inflections.core :as inflect]
    [schema.core :as s :include-macros true]
@@ -13,110 +13,152 @@
 
 (defonce app-data (atom {}))
 
+(defn fault-template [app project fault]
+  (let [{:keys [klass message notices-count last-notice-at]} fault]
+    [:tr
+     [:td
+      [:p klass]
+      [:p message]]
+     [:td last-notice-at]
+     [:td notices-count]]))
+
+(defn faults-template [app project]
+  [:table {:class "table"}
+   [:thead
+    [:tr
+     [:th "Error"]
+     [:th "Last Seen "
+      ;; TODO only display icon when order by last-seen in config
+      [:span {:class "glyphicon glyphicon-sort-by-attributes-alt"}]]
+     [:th "Count"]]]
+   [:tbody
+    (for [fault (:faults project)]
+      ^{:key (:id fault)} [fault-template app project fault])]])
+
+(defn project-tags-template [app project]
+  (let [{:keys [tags]} project]
+    (if (empty? tags)
+      [:span {:class "label label-default"} "All"]
+      [:span
+       (for [tag tags]
+         ^{:key tag} [:span {:class "label label-primary"} tag])])))
+
+(defn project-template [app project]
+  [:div {:class "col-md-6"}
+   [:div {:class "panel panel-default"}
+    [:div {:class "panel-heading"}
+     [:h2 (:name project)
+      [project-tags-template app project]]]
+    [:div {:class "panel-body"}
+     [:p "Unresolved Faults" (count (:faults project))]
+     ;; TODO display last seen error
+     [:p "Last fault occured"]]
+    [faults-template app project]]])
+
 (defn projects-template [app]
-  [:div
+  [:div {:class "row"}
    (for [project (-> @app :projects)]
-     ^{:key (:id project)} [:p (:name project)])])
+     ^{:key (:id project)} [project-template app project])])
 
 (defn app-layout [app]
-  [:div
-   [projects-template app]
-
-   ]
-  )
+  [:div {:class "container-fluid"}
+   [projects-template app]])
 
 (reagent/render-component [app-layout app-data]
                           (. js/document (getElementById "app")))
 
-(defn parse-decoded-query [decoded-query]
-  (let [without-query-symbol (subs decoded-query 1)
-        query-parameters (str/split without-query-symbol "&")]
-    (->> query-parameters
-         (map #(str/split % "="))
-         (into {})
-         (inflect/hyphenate-keys)
-         (w/keywordize-keys))))
-
-(defn initialize-config [parsed-query]
-  (letfn [(json-array-to-set [array] (when array
-                               (-> array
-                                   js/JSON.parse
-                                   set)))]
-    (-> parsed-query
-        (update :project-ids json-array-to-set)
-        (update :tags json-array-to-set))))
-
-(def config-schema
+(def Config
   {:auth-token s/Str
-   :project-ids (s/constrained #{s/Int} #(not (empty? %)))
-   (s/optional-key :tags) #{s/Str}})
+   :projects [{:id s/Int
+               :tags [s/Str]}]})
 
-(prn "atom" @app-data)
+(defn initialize-config [edn-string]
+  (let [config (cljs.reader/read-string edn-string)]
+    (s/validate Config config)))
 
-(def faults-base-params {:ignored "f" :resolved "f" :environment "production"})
+(def faults-query-params {:ignored "f" :resolved "f" :environment "production"})
 
-(defn fetch-projects-handler
-  "Takes a project from the projects channel and adds it to the app projects sequence"
-  [app]
-  (let [channel (-> @app :channels :projects-chan)]
-    (go-loop []
-      (let [raw-project (<! channel)
-            project (select-keys raw-project [:name :id])]
-        (swap! app update :projects #(conj % project))
-        (prn "Project handler updated app" @app))
-      (recur))))
+(defn make-get
+  "Makes a GET request to Honeybadger and adds the response onto a channel"
+  ([app path] (make-get app path {}))
+  ([app path query-params]
+   (let [result-chan (async/chan)]
+     (go (let [auth-params {"auth_token" (-> @app :config :auth-token)}
+               query-params-with-auth (merge auth-params query-params)
+               endpoint (str "/api" path)
+               response (async/<! (http/get endpoint {:query-params query-params-with-auth}))
+               body (inflect/hyphenate-keys (:body response))]
+           (prn "GET" endpoint (:status response))
+           (async/>! result-chan body)))
+     result-chan)))
 
-(defn fetch-projects [app]
-  (let [auth-params {"auth_token" (-> @app :config :auth-token)}
-        channel (-> @app :channels :projects-chan)
-        project-ids (-> @app :config :project-ids)]
-    (doseq [project-id project-ids]
-      (go (let [projects-endpoint (str "/api/v1/projects/" project-id)
-                raw-response (<! (http/get projects-endpoint {:query-params auth-params}))
-                response-body (inflect/hyphenate-keys (:body raw-response))]
-            (prn "Fetching project" project-id)
-            (>! channel response-body))))))
+(defn update-project
+  "Updates a project in the app projects seq, provided its id and a map"
+  [app project-id kv]
+  (let [projects (map
+                  (fn [project]
+                    (if (= (:id project) project-id)
+                      (merge project kv)
+                      project))
+                  (:projects @app))]
+    (swap! app assoc :projects projects)
+    (prn "Updated app-data" @app)))
 
-(defn fetch-faults-handler
-  "Takes a fault from the faults channel and adds them to the app faults set."
-  [app]
-  (let [channel (-> @app :channels :faults-chan)]
-    (go-loop []
-      (let [raw-fault (<! channel)
-            fault (select-keys raw-fault [:id :klass :last-notice-at :message :notices-count :project-id :tags])]
-        (swap! app update :faults #(conj % fault))
-        (prn "Fault handler updated app" @app))
-      (recur))))
+(defn update-project-with-honeybadger-data
+  [app honeybadger-project]
+  (let [{:keys [id name]} honeybadger-project]
+    (update-project app id {:name name})))
 
-(defn fetch-faults [app]
-  (let [auth-params {"auth_token" (-> @app :config :auth-token)}
-        params (merge auth-params {"environment" "production" "resolved" "f" "ignored" "f"})
-        channel (-> @app :channels :faults-chan)
-        projects-ids (-> @app :config :project-ids)]
-    (doseq [project-id projects-ids]
-      (go (let [faults-endpoint (str "/api/v1/projects/" project-id "/faults/")
-                raw-response (<! (http/get faults-endpoint {:query-params params}))
-                response-body (inflect/hyphenate-keys (:body raw-response))]
-            (prn "Fetching faults for project" project-id)
-            (doseq [fault (:results response-body)]
-              (>! channel fault)))))))
+(def fault-keys
+  [:id
+   :tags
+   :klass
+   :last-notice-at
+   :message
+   :notices-count
+   :project-id])
+
+(defn update-project-faults-with-honeybadger-data
+  [app project honeybadger-faults]
+  (let [honeybadger-faults (:results honeybadger-faults)]
+    (let [project-id (:id project)
+          project-tags (:tags project)
+          select-fault-keys-fn #(select-keys % fault-keys)
+          filter-fault-fn (fn [fault]
+                            (if (empty? project-tags)
+                              true
+                              (not (empty? (clojure.set/intersection (set (:tags fault)) (set project-tags))))))
+          faults (->> honeybadger-faults
+                      (filter filter-fault-fn)
+                      (map select-fault-keys-fn))]
+
+      (update-project app project-id {:faults faults
+                                      :faults-count (count faults)}))))
+
+(defn fetch-honeybadger-data [app]
+  (let [projects (:projects @app)]
+    (doseq [{:keys [id tags] :as project} projects]
+      (let [project-path (str "/v1/projects/" id)
+            project-faults-path (str project-path "/faults")]
+        (async/take!
+          (make-get app project-path)
+          (partial update-project-with-honeybadger-data app))
+        (async/take!
+          (make-get app project-faults-path faults-query-params)
+          (partial update-project-faults-with-honeybadger-data app project))))))
 
 (defn initialize [app]
   (let [raw-query (aget js/window "location" "search")
-        decoded-query (js/decodeURIComponent raw-query)
-        parsed-query (parse-decoded-query decoded-query)
-        config (initialize-config parsed-query)
-        channels {:projects-chan (chan)
-                  :faults-chan (chan)}]
-    (s/validate config-schema config)
+        edn-string (-> raw-query
+                       (js/decodeURIComponent)
+                       (subs 1))
+        config (initialize-config edn-string)
+        projects (:projects config)
+        config-no-projects (dissoc config :projects)]
     (swap! app merge (-> @app
-                         (assoc :projects [])
-                         (assoc :config config)
-                         (assoc :channels channels)))
-    (fetch-projects-handler app)
-    (fetch-faults-handler app)
-    (fetch-faults app)
-    (fetch-projects app)))
+                         (assoc :projects projects)
+                         (assoc :config config-no-projects)))
+    (fetch-honeybadger-data app)))
 
 (initialize app-data)
 
