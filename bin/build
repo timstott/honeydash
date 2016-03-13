@@ -1,0 +1,5 @@
+#! /bin/bash
+
+set -x
+rm -rf resources/public/js
+lein cljsbuild once min

@@ -1,0 +1,5 @@
+#! /bin/bash
+
+set -x
+HONEYDASH_VERSION=$(sed -n '1p' project.clj | grep -o '\d\.\d\.\d')
+docker build -t timstott/honeydash:$HONEYDASH_VERSION .
