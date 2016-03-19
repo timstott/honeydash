@@ -1,0 +1,17 @@
+version: "2"
+services:
+  lein:
+    image: clojure:lein-2.5.3
+    volumes:
+      - "$PWD:/tmp"
+      - "$HOME/.m2/repository/:/root/.m2/repository/"
+    command: bin/boot
+
+  nginx:
+    image: nginx:1.9.12
+    ports:
+      - "3000:80"
+    volumes:
+      - $PWD/nginx/dev:/etc/nginx/conf.d/
+    depends_on:
+      - lein
