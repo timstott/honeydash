@@ -12,3 +12,17 @@
     (let [edn-string "{:auth-token abcdef :projects [{:id 45 :tags [\"USERS\" \"ORDERS\"]}]}"]
       ;(is (thrown? (js/Error.) (core/initialize-config edn-string)))
       )))
+
+(deftest fault-has-project-tags?
+  (testing "when the project has no tags"
+    (let [fault {:tags #{}}
+          project {:tags #{}}]
+      (is (true? (core/fault-has-project-tags? project fault)))))
+  (testing "when a fault tags is included in project tags"
+    (let [fault {:tags #{"ABC"}}
+          project {:tags #{"ABC" "DEF"}}]
+      (is (true? (core/fault-has-project-tags? project fault)))))
+  (testing "when a fault tags is not included in project tags"
+    (let [fault {:tags #{"XYZ"}}
+          project {:tags #{"ABC" "DEF"}}]
+      (is (false? (core/fault-has-project-tags? project fault))))))
