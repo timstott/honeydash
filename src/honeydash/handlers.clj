@@ -1,3 +1,7 @@
+;; A Compojure application which serves static assets and
+;; proxies requests to Honeybadger to overcome browser same
+;; origin policy constraints.
+;; The application is mounted by figwheel
 (ns honeydash.handlers
   (:require [clj-http.client :as client]
             [compojure
@@ -10,7 +14,9 @@
 
 (def ^:private honeybadger-api-endpoint "https://app.honeybadger.io/v1")
 
-(defn honeybadger-api-handler [{:keys [uri query-string] :as request}]
+(defn honeybadger-api-handler
+  "Proxies requests to Honeybadger API"
+  [{:keys [uri query-string] :as request}]
   (let [requested-path (clojure.string/replace-first uri "/honeybadger" "")
         url (str honeybadger-api-endpoint requested-path "?" query-string)
         honeybadger-response (client/get url {:accept :json :as :json})]
