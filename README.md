@@ -4,7 +4,7 @@ A Honeybadger dashboard for teams
 
 ## Features
 
-- Brings projects faults in one page
+- Multiple projects faults in one page
 - Supports filtering by tag
 - Project specific configuration
 

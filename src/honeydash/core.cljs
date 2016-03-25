@@ -59,7 +59,7 @@
    (let [result-chan (async/chan)]
      (go (let [auth-token (-> @app :config :auth-token)
                query-params {"auth_token" auth-token "ignored ""f" "resolved" "f" "environment" "production"}
-               endpoint (str "/api/v1/projects/" id "/faults")]
+               endpoint (str "/honeybadger/projects/" id "/faults")]
 
            (go-loop [faults []
                      response {:body {:results [] :current-page 0 :num-pages 1}}]

@@ -6,12 +6,5 @@ services:
       - "$PWD:/tmp"
       - "$HOME/.m2/repository/:/root/.m2/repository/"
     command: bin/boot
-
-  nginx:
-    image: nginx:1.9.12
     ports:
-      - "3000:80"
-    volumes:
-      - $PWD/nginx/dev:/etc/nginx/conf.d/
-    depends_on:
-      - lein
+      - "3449:3449"

@@ -7,6 +7,10 @@
   :min-lein-version "2.5.3"
 
   :dependencies [[cljs-http "0.1.39"]
+                 [clj-http "2.1.0"]
+                 [compojure "1.4.0"]
+                 [ring/ring-defaults "0.1.5"]
+                 [ring/ring-json "0.4.0"]
                  [inflections "0.12.0"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.228"]
@@ -66,7 +70,7 @@
              ;; if you want to embed a ring handler into the figwheel http-kit
              ;; server, this is for simple ring servers, if this
              ;; doesn't work for you just run your own server :)
-             ;; :ring-handler hello_world.server/handler
+             :ring-handler honeydash.handlers/app
 
              ;; To be able to open files in your editor from the heads up display
              ;; you will need to put a script on your path.
