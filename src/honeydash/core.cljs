@@ -118,7 +118,11 @@
                          (assoc :config config-no-projects)))
     (fetch-honeybadger-data app)))
 
-(initialize app-data)
+(defn run
+  "Honeydash entrypoint"
+  []
+  (initialize app-data))
+
 
 (defn on-js-reload []
   ;; optionally touch your app to force rerendering depending on
