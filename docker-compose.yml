@@ -1,10 +1,13 @@
-version: "2"
-services:
-  lein:
-    image: clojure:lein-2.5.3
-    volumes:
-      - "$PWD:/tmp"
-      - "$HOME/.m2/repository/:/root/.m2/repository/"
-    command: bin/boot
-    ports:
-      - "3449:3449"
+lein:
+  image: clojure:lein-2.5.3
+  volumes:
+    - "$PWD:/tmp"
+    - "$HOME/.m2/repository/:/root/.m2/repository/"
+  command: bin/boot
+  ports:
+    - "3449:3449"
+phantomjs:
+  image: wernight/phantomjs:2.1.1
+  working_dir: /tmp
+  volumes:
+    - "$PWD:/tmp"

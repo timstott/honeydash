@@ -1,0 +1,5 @@
+#! /bin/bash
+
+set -x
+docker-compose run lein lein cljsbuild once test
+docker-compose run phantomjs phantomjs resources/test/test.js resources/test/test.html
