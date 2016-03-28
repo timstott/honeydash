@@ -1,6 +1,6 @@
 ;; A Compojure application which serves static assets and
-;; proxies requests to Honeybadger to overcome browser same
-;; origin policy constraints.
+;; proxies requests to Honeybadger and GitHub to overcome
+;; browser same origin policy constraints.
 ;; The application is mounted by figwheel
 (ns honeydash.handlers
   (:require [clj-http.client :as client]
@@ -13,6 +13,7 @@
             [ring.util.response :as response]))
 
 (def ^:private honeybadger-api-endpoint "https://app.honeybadger.io/v1")
+(def ^:private github-api-endpoint "https://api.github.com/")
 
 (defn honeybadger-api-handler
   "Proxies requests to Honeybadger API"
@@ -22,9 +23,18 @@
         honeybadger-response (client/get url {:accept :json :as :json})]
     (response/response (:body honeybadger-response))))
 
+(defn github-api-handler
+  "Proxies requests to GitHub API"
+  [{:keys [uri query-string] :as request}]
+  (let [requested-path (clojure.string/replace-first uri "/github" "")
+        url (str github-api-endpoint requested-path "?" query-string)
+        github-response (client/get url {:accept :json :as :json})]
+    (response/response (:body github-response))))
+
 (defroutes app-routes
   (GET "/" [] (response/resource-response "index.html" {:root "public"}))
   (GET "/honeybadger/*" [] honeybadger-api-handler)
+  (GET "/github/*" [] github-api-handler)
   (route/resources "/")
   (route/not-found "Not Found"))
 

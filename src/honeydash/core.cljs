@@ -1,15 +1,13 @@
 (ns honeydash.core
-  (:require-macros
-   [cljs.core.async.macros :refer [go go-loop]])
-  (:require
-   [clojure.set :as set]
-   [clojure.string :as str]
-   [cljs-http.client :as http]
-   [cljs.core.async :as async]
-   [clojure.walk :as w]
-   [inflections.core :as inflect]
-   [schema.core :as s :include-macros true]
-   [reagent.core :as reagent :refer [atom]]))
+  (:require [cljs-http.client :as http]
+            [cljs.core.async :as async]
+            [clojure.set :as set]
+            [clojure.walk :as cw]
+            [cognitect.transit :as t]
+            [inflections.core :as inflect]
+            [reagent.core :as reagent :refer [atom]]
+            [schema.core :as s :include-macros true])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 (enable-console-print!)
 
@@ -123,6 +121,32 @@
   []
   (initialize app-data))
 
+
+(defn parse-json
+  "Parses JSON into Clojure map with keywordized keys"
+  [json]
+  (let [json-reader (t/reader :json)]
+    (->> json
+         (t/read json-reader)
+         (cw/keywordize-keys))))
+
+(defn fetch-gist-data
+  ""
+  [gist-id]
+  (let [result-chan (async/chan)]
+    (go (let [endpoint (str "/github/gists/" gist-id)
+              gist  (async/<! (http/get endpoint))
+              gist-file (-> gist
+                            :body
+                            :files
+                            inflect/hyphenate-keys
+                            vals
+                            first)
+              gist-content (-> gist-file
+                               :content
+                               parse-json)]
+          async/>! result-chan gist-content))
+    result-chan))
 
 (defn on-js-reload []
   ;; optionally touch your app to force rerendering depending on

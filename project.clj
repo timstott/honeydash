@@ -6,18 +6,19 @@
 
   :min-lein-version "2.5.3"
 
-  :dependencies [[cljs-http "0.1.39"]
-                 [clj-http "2.1.0"]
+  :dependencies [[clj-http "2.1.0"]
+                 [cljs-http "0.1.39"]
+                 [com.cognitect/transit-cljs "0.8.237"]
                  [compojure "1.4.0"]
-                 [ring/ring-defaults "0.1.5"]
-                 [ring/ring-json "0.4.0"]
                  [inflections "0.12.0"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.228"]
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
                  [prismatic/schema "1.0.5"]
-                 [reagent "0.5.1"]]
+                 [reagent "0.5.1"]
+                 [ring/ring-defaults "0.1.5"]
+                 [ring/ring-json "0.4.0"]]
 
   :plugins [[lein-figwheel "0.5.0-6"]
             [lein-cljsbuild "1.1.2" :exclusions [[org.clojure/clojure]]]]
