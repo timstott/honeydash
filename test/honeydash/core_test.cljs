@@ -26,3 +26,14 @@
     (let [fault {:tags #{"XYZ"}}
           project {:tags #{"ABC" "DEF"}}]
       (is (false? (core/fault-has-project-tags? project fault))))))
+
+(deftest parse-decoded-query-test
+  (testing "when query params are present"
+    (let [decoded-query "?auth_token=xxx123zzz&gist_id=98421"
+          {:keys [auth-token gist-id]} (core/parse-decoded-query decoded-query)]
+      (is (= auth-token "xxx123zzz"))
+      (is (= gist-id "98421"))))
+  (testing "when no query params"
+    (let [decoded-query ""
+          parsed-query (core/parse-decoded-query decoded-query)]
+      (is (= parsed-query {})))))

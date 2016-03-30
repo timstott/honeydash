@@ -2,6 +2,7 @@
   (:require [cljs-http.client :as http]
             [cljs.core.async :as async]
             [clojure.set :as set]
+            [clojure.string :as str]
             [clojure.walk :as cw]
             [cognitect.transit :as t]
             [inflections.core :as inflect]
@@ -121,6 +122,20 @@
   []
   (initialize app-data))
 
+(defn parse-decoded-query [decoded-query]
+  (let [without-query-symbol (subs decoded-query 1)
+        query-parameters (str/split without-query-symbol "&")]
+    (->> query-parameters
+         (map #(str/split % "="))
+         (into {})
+         (inflect/hyphenate-keys)
+         (cw/keywordize-keys))))
+
+(defn initialize-uri-based-config []
+  (let [raw-query-params (aget js/window "location" "search")
+        decoded-query-params (js/decodeURIComponent raw-query-params)
+        parsed-query-params (parsed-query-params decoded-query-params)]
+    parsed-query-params))
 
 (defn parse-json
   "Parses JSON into Clojure map with keywordized keys"
@@ -131,7 +146,9 @@
          (cw/keywordize-keys))))
 
 (defn fetch-gist-data
-  ""
+  "Fetches projects related configuration provided a Gist id.
+  The result is added onto a channel.
+  The Gist must include a JSON file. "
   [gist-id]
   (let [result-chan (async/chan)]
     (go (let [endpoint (str "/github/gists/" gist-id)
