@@ -156,9 +156,9 @@
 
 (defn make-faults-sorted-set [order-by]
   (letfn [(descending-date-comparator [x y]
-            (* -1 (compare (:last-notice-at x) (:last-notice-at y))))
+            (compare (:last-notice-at y) (:last-notice-at x)))
           (descending-count-comparator [x y]
-            (let [result (* -1 (compare (:notices-count x) (:notices-count y)))]
+            (let [result (compare (:notices-count y) (:notices-count x))]
               (if (= result 0)
                 (descending-date-comparator x y)
                 result)))]
