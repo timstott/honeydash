@@ -43,17 +43,10 @@
 (reagent/render-component [app-layout app-data]
                           (. js/document (getElementById "app")))
 
-(def Config
-  {:auth-token s/Str
-   :projects [{:id s/Int
-               :tags [s/Str]}]})
-
-(defn initialize-config [edn-string]
-  (let [config (cljs.reader/read-string edn-string)]
-    (s/validate Config config)))
+(def ^:private honeybadger-request-timeout-ms 1000)
 
 (defn honeybadger-get-faults
-  "Requests all project id faults from Honeybadger and adds the response onto a channel"
+  "Requests all project faults from Honeybadger and adds the response onto a channel"
   ([app id]
    (let [result-chan (async/chan)]
      (go (let [auth-token (-> @app :config :auth-token)
@@ -64,11 +57,10 @@
                      response {:body {:results [] :current-page 0 :num-pages 1}}]
 
              (let [{:keys [results current-page num-pages]} (inflect/hyphenate-keys (:body response))]
-               (count (prn faults))
                (if (>= current-page num-pages)
                  (async/>! result-chan (concat faults results))
                  (let [query-params (assoc query-params :page (inc current-page))
-                       response (async/<! (http/get endpoint {:query-params query-params}))]
+                       response (async/<! (http/get endpoint {:query-params query-params :timeout honeybadger-request-timeout-ms}))]
                    (prn "GET" endpoint (:status response))
                    (recur (concat faults results) response)))))))
      result-chan)))
@@ -93,34 +85,14 @@
    :project-tags (:tags project)})
 
 (defn fetch-honeybadger-data [app]
-
   (doseq [{:keys [id] :as project} (:projects @app)]
     (go (let [honeybadger-faults (async/<! (honeybadger-get-faults app id))
               faults (->> honeybadger-faults
                          (filter (partial fault-has-project-tags? project))
                          (map (partial build-fault project)))]
 
-          (swap! app update-in [:faults] concat faults)
+          (swap! app update-in [:faults] into faults)
           (prn @app)))))
-
-(defn initialize [app]
-  (let [raw-query (aget js/window "location" "search")
-        edn-string (-> raw-query
-                       (js/decodeURIComponent)
-                       (subs 1))
-        config (initialize-config edn-string)
-        projects (:projects config)
-        config-no-projects (dissoc config :projects)]
-    (swap! app merge (-> @app
-                         (assoc :faults [])
-                         (assoc :projects projects)
-                         (assoc :config config-no-projects)))
-    (fetch-honeybadger-data app)))
-
-(defn run
-  "Honeydash entrypoint"
-  []
-  (initialize app-data))
 
 (defn parse-decoded-query [decoded-query]
   (let [without-query-symbol (subs decoded-query 1)
@@ -131,11 +103,18 @@
          (inflect/hyphenate-keys)
          (cw/keywordize-keys))))
 
-(defn initialize-uri-based-config []
+(def UriConfig
+  {:auth-token s/Str
+   :gist-id s/Str
+   :order-by (s/enum "count" "recent")})
+
+(defn initialize-uri-config
+  "Creates and validates a config map from the browser location bar."
+  []
   (let [raw-query-params (aget js/window "location" "search")
         decoded-query-params (js/decodeURIComponent raw-query-params)
-        parsed-query-params (parsed-query-params decoded-query-params)]
-    parsed-query-params))
+        parsed-query-params (parse-decoded-query decoded-query-params)]
+    (s/validate UriConfig parsed-query-params)))
 
 (defn parse-json
   "Parses JSON into Clojure map with keywordized keys"
@@ -145,14 +124,23 @@
          (t/read json-reader)
          (cw/keywordize-keys))))
 
+(def ProjectConfig {:id s/Int
+                    :name s/Str
+                    :tags [s/Str]})
+
+(def GistConfig [ProjectConfig])
+
+(def ^:private github-request-timeout-ms 2000)
+
 (defn fetch-gist-data
   "Fetches projects related configuration provided a Gist id.
   The result is added onto a channel.
   The Gist must include a JSON file. "
   [gist-id]
   (let [result-chan (async/chan)]
+    (println "Fetching Gist data with id" gist-id)
     (go (let [endpoint (str "/github/gists/" gist-id)
-              gist  (async/<! (http/get endpoint))
+              gist  (async/<! (http/get endpoint {:timeout github-request-timeout-ms}))
               gist-file (-> gist
                             :body
                             :files
@@ -162,8 +150,35 @@
               gist-content (-> gist-file
                                :content
                                parse-json)]
-          async/>! result-chan gist-content))
+          (s/validate GistConfig gist-content)
+          (async/>! result-chan gist-content)))
     result-chan))
+
+(defn make-faults-sorted-set [order-by]
+  (letfn [(descending-date-comparator [x y]
+            (* -1 (compare (:last-notice-at x) (:last-notice-at y))))
+          (descending-count-comparator [x y]
+            (let [result (* -1 (compare (:notices-count x) (:notices-count y)))]
+              (if (= result 0)
+                (descending-date-comparator x y)
+                result)))]
+    (sorted-set-by descending-count-comparator)))
+
+(defn initialize [app]
+  (go (let [{:keys [auth-token gist-id order-by] :as config} (initialize-uri-config)
+            projects-config (async/<! (fetch-gist-data gist-id))
+            faults-sorted-set (make-faults-sorted-set order-by)]
+
+        (swap! app merge (assoc @app :config config :projects projects-config :faults faults-sorted-set))
+
+        (fetch-honeybadger-data app))))
+
+(defn run
+  "Honeydash entrypoint"
+  []
+  (println "Initializing Honeydash")
+  (initialize app-data)
+  )
 
 (defn on-js-reload []
   ;; optionally touch your app to force rerendering depending on
