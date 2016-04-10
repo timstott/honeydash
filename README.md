@@ -12,8 +12,12 @@ A Honeybadger dashboard for teams
 
 ## How to Use
 
-WIP
-`https://localhost?auth_token=_honeybadger_token_&gist_id=_gist_id_&order_by=_method_`
+Get the latest Honeydash image
+```
+docker run -p 8005:80 timstott/honeydash
+```
+
+Browse to `http://localhost:8005?auth_token=<honeybadger token>&gist_id=<gist id>&order_by=<method>`
 
 Query parameters:
 
@@ -65,4 +69,14 @@ Alternatively you can run the tests in the terminal with (phantomjs required):
 
 ```
 bin/test
+```
+
+## Distribution
+
+Honeydash is available as a docker image.
+
+You may compile the source and build a new image with:
+```
+bin/compile
+bin/build-image
 ```

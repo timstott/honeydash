@@ -208,6 +208,7 @@
   (initialize app-data)
   )
 
+(run)
 (defn on-js-reload []
   ;; optionally touch your app to force rerendering depending on
   ;; your application
