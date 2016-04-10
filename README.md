@@ -2,6 +2,8 @@
 
 A Honeybadger dashboard for teams
 
+![honeydash](https://cloud.githubusercontent.com/assets/1334474/14407554/7e04f46e-fec5-11e5-9542-7b323bbe5eb0.jpg)
+
 ## Features
 
 - Aggregates multiple projects faults on one page
