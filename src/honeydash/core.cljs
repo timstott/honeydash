@@ -14,18 +14,37 @@
 
 (defonce app-data (atom {}))
 
+(defn tags-template [app {:keys [project-id fault-tags fault-id]}]
+  (when-not (empty? fault-tags)
+    [:span {:class "ui labels"}
+     (for [tag-name fault-tags]
+       ^{:key [project-id tag-name fault-id]}
+       [:a {:class "ui label tiny"} tag-name])]))
+
+(defn fault-url [{:keys [fault-id project-id]}]
+  (str "https://app.honeybadger.io/projects/" project-id "/faults/" fault-id))
+
+(defn fault-message-ellipsis [message]
+  (if (>= (count message) 97)
+    (str (subs message 0 96) "...")
+    message))
+
 (defn fault-template [app fault]
   (let [{:keys [project-name klass message notices-count last-notice-at]} fault]
-    [:tr
+    [:tr {:class "fault"}
      [:td project-name]
      [:td
-      [:p klass]
-      [:p message]]
+      [:div {:class "klass"}
+       [:span {:class "name"}
+        [:a {:href (fault-url fault) :target "_blank"} klass]]
+       [tags-template app fault]]
+      [:code (fault-message-ellipsis message)]]
+     ;; TODO time ago
      [:td last-notice-at]
      [:td notices-count]]))
 
 (defn faults-template [app]
-  [:table
+  [:table {:class "ui table compact striped"}
    [:thead
     [:tr
      [:th "Project"]
@@ -37,8 +56,7 @@
       ^{:key (:fault-id fault)} [fault-template app fault])]])
 
 (defn app-layout [app]
-  [:div {:class "container-fluid"}
-   [faults-template app]])
+  [faults-template app])
 
 (reagent/render-component [app-layout app-data]
                           (. js/document (getElementById "app")))
@@ -82,7 +100,8 @@
    :notices-count (:notices-count fault)
    :project-id (:id project)
    :project-name (:name project)
-   :project-tags (:tags project)})
+   :project-tags (:tags project)
+   :fault-tags (:tags fault)})
 
 (defn fetch-honeybadger-data [app]
   (doseq [{:keys [id] :as project} (:projects @app)]
@@ -154,23 +173,32 @@
           (async/>! result-chan gist-content)))
     result-chan))
 
-(defn make-faults-sorted-set [order-by]
-  (letfn [(descending-date-comparator [x y]
-            (compare (:last-notice-at y) (:last-notice-at x)))
+(defn make-sorted-set
+  "Creates a sorted set by fault count or fault last noticed at."
+  [order-by]
+  (letfn [(ascending-fault-comparator [x y]
+            (compare (select-keys [:project-id :fault-id] x)
+                     (select-keys [:project-id :fault-id] y)))
+          (descending-date-comparator [x y]
+            (let [result (compare (:last-notice-at y) (:last-notice-at x))]
+              (if (= result 0)
+                (ascending-fault-comparator x y)
+                result)))
           (descending-count-comparator [x y]
             (let [result (compare (:notices-count y) (:notices-count x))]
               (if (= result 0)
                 (descending-date-comparator x y)
                 result)))]
-    (sorted-set-by descending-count-comparator)))
+    (case order-by
+      "count" (sorted-set-by descending-count-comparator)
+      "recent" (sorted-set-by descending-date-comparator))))
 
+;; TODO set refresh interval
 (defn initialize [app]
   (go (let [{:keys [auth-token gist-id order-by] :as config} (initialize-uri-config)
             projects-config (async/<! (fetch-gist-data gist-id))
-            faults-sorted-set (make-faults-sorted-set order-by)]
-
+            faults-sorted-set (make-sorted-set order-by)]
         (swap! app merge (assoc @app :config config :projects projects-config :faults faults-sorted-set))
-
         (fetch-honeybadger-data app))))
 
 (defn run

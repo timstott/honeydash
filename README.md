@@ -4,11 +4,41 @@ A Honeybadger dashboard for teams
 
 ## Features
 
-- Multiple projects faults in one page
+- Aggregates multiple projects faults on one page
 - Supports filtering by tag
 - Project specific configuration
 
-## Setup
+## How to Use
+
+WIP
+`https://localhost?auth_token=_honeybadger_token_&gist_id=_gist_id_&order_by=_method_`
+
+Query parameters:
+
+- `auth_token`: Honeybadger user token available at https://app.honeybadger.io/users/edit
+- `gist_id`: Projects configuration Gist id
+- `order_by`: Sort faults by highest number of occurrence with `count` or by most recent occurrence with `recent`
+
+
+Projects configuration:
+
+Honeydash fetches Honeybadger project faults based on the configuration specified in a Gist.
+
+The Gist must include one JSON file with the following syntax:
+```json
+[
+  {
+    "id": 9009,
+    "name": "Data Warehouse",
+    "tags": []
+  },
+  {
+    "id": 9010,
+    "name": "Data Processor",
+    "tags": ["SPLIT A", "SPLIT B"]
+  }
+]
+```
 
 ## Development
 

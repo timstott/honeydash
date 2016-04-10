@@ -1,2 +1,13 @@
 /* some style */
+body { margin: 0; }
 
+.fault .klass > span {
+    display: inline-block;
+    margin: 0.7rem 0;
+}
+.fault .klass span.labels {
+    margin-left: 1rem;
+}
+.fault .klass span.labels > a {
+    margin-bottom: 0;
+}
