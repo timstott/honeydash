@@ -26,3 +26,61 @@
     (let [decoded-query ""
           parsed-query (core/parse-decoded-query decoded-query)]
       (is (= parsed-query {})))))
+
+(def honeybadger-project-0
+  {:id 0
+   :name "Marketplace"
+   :tags []})
+
+(def honeybadger-fault-0
+  {:id 0
+   :klass "SocketError"
+   :last-notice-at "2016-05-13T09:50:16.000Z"
+   :message "getaddrinfo: Temporary failure in name resolution"
+   :notices-count 1
+   :tags ["MKRT"]})
+
+(def honeybadger-fault-1
+  {:id 1
+   :klass "Sequel::DatabaseDisconnectError"
+   :last-notice-at "2016-05-13T10:00:00.000Z"
+   :message "PG::ConnectionBad: PQconsumeInput()"
+   :notices-count 2
+   :tags ["MKRT"]})
+
+(def honeybadger-fault-2
+  {:id 2
+   :klass "RecordNotFound"
+   :last-notice-at "2016-05-13T16:00:45.000Z"
+   :message ""
+   :notices-count 25
+   :tags []})
+
+(deftest build-fault-test
+  (let [expected-fault {:fault-id 0
+                        :klass "SocketError"
+                        :last-notice-at "2016-05-13T09:50:16.000Z"
+                        :message "getaddrinfo: Temporary failure in name resolution"
+                        :notices-count 1
+                        :project-id 0
+                        :project-name "Marketplace"
+                        :project-tags []
+                        :fault-tags ["MKRT"]}]
+    (is (= (core/build-fault honeybadger-project-0 honeybadger-fault-0) expected-fault))))
+
+(deftest make-sorted-set-test
+  (let [fault-0 (core/build-fault honeybadger-project-0 honeybadger-fault-0)
+        fault-1 (core/build-fault honeybadger-project-0 honeybadger-fault-1)
+        fault-2 (core/build-fault honeybadger-project-0 honeybadger-fault-2)]
+    (testing "when sorted by most count"
+      (let [sorted-set-by-count (-> (core/make-sorted-set "count") (conj fault-0 fault-2 fault-1))]
+        (is (= (first sorted-set-by-count) fault-2))
+        (is (= (last sorted-set-by-count) fault-0))))
+    (testing "when sorted by recent occurrence"
+      (let [sorted-set-by-count (-> (core/make-sorted-set "recent") (conj fault-1 fault-0 fault-2))]
+        (is (= (first sorted-set-by-count) fault-2))
+        (is (= (last sorted-set-by-count) fault-0))))
+    (testing "when duplicate faults are added"
+      (let [sorted-set-by-count (-> (core/make-sorted-set "recent") (conj fault-1 fault-1 fault-1))]
+        (is (= (first sorted-set-by-count) fault-1))
+        (is (= (count sorted-set-by-count) 1))))))

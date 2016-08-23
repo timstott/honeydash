@@ -1,4 +1,4 @@
-(defproject honeydash "1.0.0"
+(defproject honeydash "1.0.1"
   :description "A Honeybadger dashboard for teams"
   :url "http://github.com/timstott/honeydash"
   :license {:name "MIT"

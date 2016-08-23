@@ -174,11 +174,11 @@
     result-chan))
 
 (defn make-sorted-set
-  "Creates a sorted set by fault count or fault last noticed at."
+  "Creates a set sorted by fault count or fault last noticed at."
   [order-by]
   (letfn [(ascending-fault-comparator [x y]
-            (compare (select-keys [:project-id :fault-id] x)
-                     (select-keys [:project-id :fault-id] y)))
+            (compare [(:project-id x) (:fault-id x)]
+                     [(:project-id y) (:fault-id y)]))
           (descending-date-comparator [x y]
             (let [result (compare (:last-notice-at y) (:last-notice-at x))]
               (if (= result 0)
