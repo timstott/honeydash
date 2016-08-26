@@ -16,7 +16,7 @@
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
                  [prismatic/schema "1.0.5"]
-                 [reagent "0.5.1"]
+                 [reagent "0.6.0-rc"]
                  [ring/ring-defaults "0.1.5"]
                  [ring/ring-json "0.4.0"]]
 
