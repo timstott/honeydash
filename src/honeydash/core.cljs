@@ -8,6 +8,7 @@
             [honeydash.components :as cps]
             [inflections.core :as inflect]
             [reagent.core :as reagent :refer [atom]]
+            [schema.coerce :as coerce]
             [schema.core :as s :include-macros true])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
@@ -85,15 +86,27 @@
 (def UriConfig
   {:auth-token s/Str
    :gist-id s/Str
+   (s/optional-key :refresh-interval) s/Int
    :order-by (s/enum "count" "recent")})
 
+(defn coerce-query-params [query-params]
+  (letfn [(string-to-int [s]
+            (if (string? s)
+              (js/parseInt s 10)
+              s))]
+    ((coerce/coercer UriConfig {s/Int string-to-int}) query-params)))
+
+(defn uri-query-params []
+  (aget js/window "location" "search"))
+
 (defn initialize-uri-config
-  "Creates and validates a config map from the browser location bar."
-  []
-  (let [raw-query-params (aget js/window "location" "search")
-        decoded-query-params (js/decodeURIComponent raw-query-params)
-        parsed-query-params (parse-decoded-query decoded-query-params)]
-    (s/validate UriConfig parsed-query-params)))
+  "Creates and validates a config map."
+  [raw-query-params]
+  (->> raw-query-params
+       js/decodeURIComponent
+       parse-decoded-query
+       coerce-query-params
+       (s/validate UriConfig)))
 
 (defn parse-json
   "Parses JSON into Clojure map with keywordized keys"
@@ -155,7 +168,7 @@
 
 ;; TODO set refresh interval
 (defn initialize [app]
-  (go (let [{:keys [auth-token gist-id order-by] :as config} (initialize-uri-config)
+  (go (let [{:keys [auth-token gist-id order-by] :as config} (initialize-uri-config (uri-query-params))
             projects-config (async/<! (fetch-gist-data gist-id))
             faults-sorted-set (make-sorted-set order-by)]
         (swap! app merge (assoc @app :config config :projects projects-config :faults faults-sorted-set))

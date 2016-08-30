@@ -27,6 +27,28 @@
           parsed-query (core/parse-decoded-query decoded-query)]
       (is (= parsed-query {})))))
 
+(deftest coerced-query-params-test
+  (testing "when a param is a number represented as a string"
+    (let [query-params {:auth-token "abcd"
+                        :gist-id "abcd"
+                        :order-by "count"
+                        :refresh-interval "60"}
+          {:keys [refresh-interval]} (core/coerce-query-params query-params)]
+        (is (= refresh-interval 60)))))
+
+(deftest initialize-uri-config-test
+  (testing "when query params are valid"
+    (let [raw-query-params "?auth_token=abcd&gist_id=abcd&order_by=recent&refresh_interval=30"
+          expected-result {:auth-token "abcd"
+                           :gist-id "abcd"
+                           :order-by "recent"
+                           :refresh-interval 30}]
+      (is (= (core/initialize-uri-config raw-query-params) expected-result))))
+  (testing "when query params are invalid"
+    (let [raw-query-params "?auth_token=abcd&gist_id=abcd"]
+      (is (thrown-with-msg? js/Error #"Value does not match schema"
+                            (core/initialize-uri-config raw-query-params))))))
+
 (def honeybadger-project-0
   {:id 0
    :name "Marketplace"
