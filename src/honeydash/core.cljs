@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [clojure.walk :as cw]
             [cognitect.transit :as t]
+            [honeydash.components :as cps]
             [inflections.core :as inflect]
             [reagent.core :as reagent :refer [atom]]
             [schema.core :as s :include-macros true])
@@ -14,49 +15,8 @@
 
 (defonce app-data (atom {}))
 
-(defn tags-template [app {:keys [project-id fault-tags fault-id]}]
-  (when-not (empty? fault-tags)
-    [:span {:class "ui labels"}
-     (for [tag-name fault-tags]
-       ^{:key [project-id tag-name fault-id]}
-       [:a {:class "ui label tiny"} tag-name])]))
-
-(defn fault-url [{:keys [fault-id project-id]}]
-  (str "https://app.honeybadger.io/projects/" project-id "/faults/" fault-id))
-
-(defn fault-message-ellipsis [message]
-  (if (>= (count message) 97)
-    (str (subs message 0 96) "...")
-    message))
-
-(defn fault-template [app fault]
-  (let [{:keys [project-name klass message notices-count last-notice-at]} fault]
-    [:tr {:class "fault"}
-     [:td project-name]
-     [:td
-      [:div {:class "klass"}
-       [:span {:class "name"}
-        [:a {:href (fault-url fault) :target "_blank"} klass]]
-       [tags-template app fault]]
-      [:code (fault-message-ellipsis message)]]
-     ;; TODO time ago
-     [:td last-notice-at]
-     [:td notices-count]]))
-
-(defn faults-template [app]
-  [:table {:class "ui table compact striped"}
-   [:thead
-    [:tr
-     [:th "Project"]
-     [:th "Error"]
-     [:th "Last Seen"]
-     [:th "Count"]]]
-   [:tbody
-    (for [fault (:faults @app)]
-      ^{:key (:fault-id fault)} [fault-template app fault])]])
-
 (defn app-layout [app]
-  [faults-template app])
+  [cps/faults-list-component app])
 
 (reagent/render-component [app-layout app-data]
                           (. js/document (getElementById "app")))
